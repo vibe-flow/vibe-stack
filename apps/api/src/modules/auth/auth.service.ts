@@ -65,6 +65,24 @@ export class AuthService {
     return this.generateTokens(user)
   }
 
+  async loginAs(email?: string, role?: string): Promise<AuthResponse> {
+    if (process.env.NODE_ENV !== 'development') {
+      throw new UnauthorizedException('Dev-only endpoint')
+    }
+
+    const user = email
+      ? await this.prisma.user.findUnique({ where: { email } })
+      : await this.prisma.user.findFirst({ where: { role: role as any } })
+
+    if (!user) {
+      throw new UnauthorizedException('No user found with given criteria')
+    }
+
+    this.logger.log(`[DEV] Login as: ${user.email} (${user.role})`)
+
+    return this.generateTokens(user)
+  }
+
   async refreshToken(refreshToken: string): Promise<AuthResponse> {
     try {
       const payload = this.jwtService.verify(refreshToken, {

@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Request, Inject } from '@nestjs/common'
+import { Controller, Post, Get, Body, Query, UseGuards, Request, Inject } from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiResponse } from '@nestjs/swagger'
 import { AuthService } from './auth.service'
 import { JwtAuthGuard } from './guards/jwt-auth.guard'
@@ -33,6 +33,14 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Invalid credentials', type: ApiErrorDto })
   async login(@Body() body: LoginDto) {
     return this.authService.login(body)
+  }
+
+  @Get('dev/login-as')
+  @ApiOperation({ summary: '[DEV ONLY] Login as any user without password' })
+  @ApiResponse({ status: 200, type: AuthResponseDto })
+  @ApiResponse({ status: 401, description: 'User not found or not in dev mode', type: ApiErrorDto })
+  async loginAs(@Query('email') email?: string, @Query('role') role?: string) {
+    return this.authService.loginAs(email, role)
   }
 
   @Post('refresh')
