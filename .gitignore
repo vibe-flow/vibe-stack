@@ -30,6 +30,9 @@ coverage/
 prisma/migrations/**
 !prisma/migrations/.gitkeep
 
+# Worktrees
+.worktrees/
+
 # Temp files
 *.tmp
 *.temp

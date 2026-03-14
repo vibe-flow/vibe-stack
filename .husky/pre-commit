@@ -5,7 +5,7 @@ if [ "$branch" = "main" ] || [ "$branch" = "develop" ]; then
     echo ""
     echo "Commits directs sur '$branch' interdits."
     echo "Creer une branche feature/ ou fix/ depuis develop (ou hotfix/ depuis main)."
-    echo "Utiliser un worktree : git worktree add ../feature-name develop"
+    echo "Utiliser un worktree : git worktree add .worktrees/feature-name develop"
     echo ""
     exit 1
   fi
