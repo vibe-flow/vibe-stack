@@ -8,8 +8,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, envDir, '')
 
   // Configurable ports via .env
-  const frontendPort = parseInt(env.VITE_PORT || '5173', 10)
-  const backendPort = parseInt(env.PORT || '3000', 10)
+  const frontendPort = parseInt(env.FRONTEND_PORT || '5173', 10)
+  const backendPort = parseInt(env.BACKEND_PORT || '3000', 10)
   const backendTarget = `http://localhost:${backendPort}`
 
   return {

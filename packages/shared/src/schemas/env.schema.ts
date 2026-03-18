@@ -35,8 +35,9 @@ export const EnvSchema = z.object({
   // Logging
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 
-  // Server
-  PORT: z.string().default('3000'),
+  // Ports
+  FRONTEND_PORT: z.string().default('5173'),
+  BACKEND_PORT: z.string().default('3000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 })
 

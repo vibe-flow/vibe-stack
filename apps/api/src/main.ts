@@ -24,7 +24,7 @@ async function bootstrap() {
   })
 
   const configService = app.get(ConfigService)
-  const port = configService.get('PORT', 3000)
+  const port = configService.get('BACKEND_PORT', 3000)
 
   // CORS - origin: true accepts all origins in dev (local-services via Caddy or direct)
   app.enableCors({
