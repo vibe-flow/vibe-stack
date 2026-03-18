@@ -13,6 +13,8 @@
     "test:cov": "vitest run --coverage"
   },
   "dependencies": {
+    "@radix-ui/react-label": "^2.1.8",
+    "@radix-ui/react-switch": "^1.2.6",
     "@tanstack/react-query": "^5.62.14",
     "@template-dev/shared": "workspace:*",
     "@trpc/client": "^11.0.0-rc.665",

@@ -5,6 +5,7 @@ import { TrpcService } from './trpc.service'
 import { AuthTrpc } from '../modules/auth/auth.trpc'
 import { UsersTrpc } from '../modules/users/users.trpc'
 import { AiTrpc } from '../modules/ai/ai.trpc'
+import { SettingsTrpc } from '../modules/settings/settings.trpc'
 import { createContext } from './trpc.context'
 
 @Injectable()
@@ -16,12 +17,14 @@ export class TrpcRouter implements OnApplicationBootstrap {
     @Inject(AuthTrpc) private readonly authTrpc: AuthTrpc,
     @Inject(UsersTrpc) private readonly usersTrpc: UsersTrpc,
     @Inject(AiTrpc) private readonly aiTrpc: AiTrpc,
+    @Inject(SettingsTrpc) private readonly settingsTrpc: SettingsTrpc,
   ) {
     // Assemble modular routers
     this.appRouter = this.trpc.router({
       auth: this.authTrpc.router,
       users: this.usersTrpc.router,
       ai: this.aiTrpc.router,
+      settings: this.settingsTrpc.router,
     })
   }
 

@@ -7,6 +7,7 @@ import { EnvSchema } from '@template-dev/shared'
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { PrismaModule } from './modules/prisma/prisma.module'
+import { SettingsModule } from './modules/settings/settings.module'
 import { AuthModule } from './modules/auth/auth.module'
 import { UsersModule } from './modules/users/users.module'
 import { AiModule } from './modules/ai/ai.module'
@@ -37,6 +38,7 @@ import { TrpcModule } from './trpc/trpc.module'
     ]),
     LoggerModule,
     PrismaModule,
+    SettingsModule,
     AuthModule,
     UsersModule,
     LangfuseModule,

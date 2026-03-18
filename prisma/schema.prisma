@@ -42,3 +42,11 @@ model RefreshToken {
   @@index([userId])
   @@map("refresh_tokens")
 }
+
+model Setting {
+  id        String   @id
+  data      Json     @default("{}")
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
