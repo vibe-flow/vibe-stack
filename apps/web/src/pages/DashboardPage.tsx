@@ -62,6 +62,9 @@ export default function DashboardPage() {
               <span className="text-sm text-muted-foreground">
                 {user?.name} ({user?.role})
               </span>
+              <a href="/settings" className="text-sm text-muted-foreground hover:text-foreground">
+                Settings
+              </a>
               <Button variant="outline" onClick={handleLogout} disabled={logoutMutation.isPending}>
                 {logoutMutation.isPending ? 'Déconnexion...' : 'Se déconnecter'}
               </Button>
