@@ -3,25 +3,19 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import { Logger } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
 import { cleanupOpenApiDoc } from 'nestjs-zod'
-import * as pino from 'pino'
 import { AppModule } from './app.module'
 import { TrpcRouter } from './trpc/trpc.router'
+import { LoggerService } from './modules/logger/logger.service'
 
 async function bootstrap() {
-  const logger = pino.default({
-    transport: {
-      target: 'pino-pretty',
-      options: {
-        colorize: true,
-        translateTime: 'HH:MM:ss Z',
-        ignore: 'pid,hostname',
-      },
-    },
-  })
-
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
   })
+
+  // Use our LoggerService as the global NestJS logger
+  // This routes ALL logs (including new Logger() in services) through Hub log buffer
+  const loggerService = app.get(LoggerService)
+  app.useLogger(loggerService)
 
   const configService = app.get(ConfigService)
   const port = configService.get('BACKEND_PORT', 3000)
