@@ -7,6 +7,7 @@ export default defineConfig({
     environment: 'node',
     root: './',
     include: ['src/**/*.{test,spec}.ts'],
+    exclude: ['src/**/*.integration.spec.ts', 'node_modules', 'dist'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
