@@ -1,11 +1,37 @@
+import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { DEMO_MODE } from './demo'
 import { useDemo } from './demo/DemoProvider'
-import { useIsAuthenticated, useAuthLoading } from './stores/auth.store'
+import { useIsAuthenticated, useAuthLoading, useAccessToken } from './stores/auth.store'
+import { useSseStore } from './stores/sse.store'
+import { useEntityInvalidation } from './hooks/useEntityInvalidation'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import SettingsPage from './pages/SettingsPage'
+
+// ============================================================================
+// SSE MANAGER - MODE NORMAL UNIQUEMENT
+// ============================================================================
+
+function SseManager() {
+  const accessToken = useAccessToken()
+  const isAuthenticated = useIsAuthenticated()
+  useEntityInvalidation()
+
+  useEffect(() => {
+    if (isAuthenticated && accessToken) {
+      useSseStore.getState().connect(accessToken)
+    } else {
+      useSseStore.getState().disconnect()
+    }
+    return () => {
+      useSseStore.getState().disconnect()
+    }
+  }, [isAuthenticated, accessToken])
+
+  return null
+}
 
 // ============================================================================
 // ROUTES PROTÉGÉES - MODE NORMAL (avec Zustand)
@@ -103,41 +129,44 @@ function App() {
 
   // Mode normal
   return (
-    <Routes>
-      <Route
-        path="/login"
-        element={
-          <PublicRoute>
-            <LoginPage />
-          </PublicRoute>
-        }
-      />
-      <Route
-        path="/register"
-        element={
-          <PublicRoute>
-            <RegisterPage />
-          </PublicRoute>
-        }
-      />
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            <DashboardPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/settings"
-        element={
-          <ProtectedRoute>
-            <SettingsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="/" element={<Navigate to="/dashboard" />} />
-    </Routes>
+    <>
+      <SseManager />
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <LoginPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <RegisterPage />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/" element={<Navigate to="/dashboard" />} />
+      </Routes>
+    </>
   )
 }
 
