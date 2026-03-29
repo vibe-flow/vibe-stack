@@ -273,6 +273,7 @@ describe('AuthService', () => {
 
   describe('inviteUser', () => {
     it('should create user with ACTIVE status and send invite email', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(null)
       mockPrismaService.user.create.mockResolvedValue(mockUser)
       mockPrismaService.magicToken.create.mockResolvedValue({})
 

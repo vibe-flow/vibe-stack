@@ -58,10 +58,13 @@ export class AuthService {
           data: { email, status: 'ACTIVE' },
         })
         userId = newUser.id
-      } else {
+        shouldSend = true
+      } else if (user.status === 'ACTIVE') {
         userId = user.id
+        shouldSend = true
+      } else {
+        shouldSend = false
       }
-      shouldSend = true
     } else if (this.authConfig.registrationMode === 'approval') {
       if (!user) {
         await this.prisma.user.create({
@@ -158,6 +161,11 @@ export class AuthService {
   }
 
   async inviteUser(email: string, role: 'USER' | 'ADMIN'): Promise<void> {
+    const existing = await this.prisma.user.findUnique({ where: { email } })
+    if (existing) {
+      throw new TRPCError({ code: 'CONFLICT', message: 'User with this email already exists' })
+    }
+
     const user = await this.prisma.user.create({
       data: { email, role, status: 'ACTIVE' },
     })
