@@ -1,17 +1,28 @@
 import { describe, it, expect, afterEach } from 'vitest'
 
 describe('auth config factory', () => {
+  const originalNodeEnv = process.env.NODE_ENV
+
   afterEach(() => {
     delete process.env.AUTH_REGISTRATION_MODE
     delete process.env.AUTH_MAGIC_LINK_TTL
     delete process.env.AUTH_DEV_LOGIN
+    process.env.NODE_ENV = originalNodeEnv
   })
 
-  it('returns defaults when no env vars are set', async () => {
+  it('returns defaults when no env vars are set (test env)', async () => {
     const { default: authConfigFactory } = await import('./auth.config')
     const config = authConfigFactory()
     expect(config.registrationMode).toBe('open')
     expect(config.magicLinkTtl).toBe(15)
+    // devLogin is false in test env (only true in development or when AUTH_DEV_LOGIN=true)
+    expect(config.devLogin).toBe(false)
+  })
+
+  it('enables devLogin in development', async () => {
+    process.env.NODE_ENV = 'development'
+    const mod = await import('./auth.config?t=' + Date.now())
+    const config = mod.default()
     expect(config.devLogin).toBe(true)
   })
 

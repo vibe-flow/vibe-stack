@@ -11,7 +11,7 @@ export default registerAs('auth', () => {
   const config = AuthConfigSchema.parse({
     registrationMode: process.env.AUTH_REGISTRATION_MODE ?? 'open',
     magicLinkTtl: Number(process.env.AUTH_MAGIC_LINK_TTL ?? 15),
-    devLogin: process.env.AUTH_DEV_LOGIN !== 'false',
+    devLogin: process.env.AUTH_DEV_LOGIN === 'true' || process.env.NODE_ENV === 'development',
   })
   return config
 })

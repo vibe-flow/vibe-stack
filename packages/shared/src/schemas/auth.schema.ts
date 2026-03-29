@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { UserRoleSchema, UserStatusSchema } from './user.schema'
 
 // --- Input schemas ---
 export const SendMagicLinkSchema = z.object({
@@ -15,12 +16,12 @@ export const RefreshTokenSchema = z.object({
 
 export const InviteUserSchema = z.object({
   email: z.string().email('Invalid email address'),
-  role: z.enum(['USER', 'ADMIN']).default('USER'),
+  role: UserRoleSchema.default('USER'),
 })
 
 export const DevLoginSchema = z.object({
   email: z.string().email().optional(),
-  role: z.string().optional(),
+  role: UserRoleSchema.optional(),
 })
 
 // --- Response schemas ---
@@ -31,8 +32,8 @@ export const AuthResponseSchema = z.object({
     id: z.string(),
     email: z.string().email(),
     name: z.string().nullable(),
-    role: z.enum(['USER', 'ADMIN']),
-    status: z.enum(['ACTIVE', 'PENDING', 'DISABLED']),
+    role: UserRoleSchema,
+    status: UserStatusSchema,
   }),
 })
 
@@ -45,7 +46,7 @@ export const DevUserSchema = z.object({
   id: z.string(),
   email: z.string(),
   name: z.string().nullable(),
-  role: z.enum(['USER', 'ADMIN']),
+  role: UserRoleSchema,
 })
 
 // --- Types ---
@@ -55,4 +56,5 @@ export type RefreshTokenInput = z.infer<typeof RefreshTokenSchema>
 export type InviteUserInput = z.infer<typeof InviteUserSchema>
 export type DevLoginInput = z.infer<typeof DevLoginSchema>
 export type AuthResponse = z.infer<typeof AuthResponseSchema>
+export type MagicLinkSent = z.infer<typeof MagicLinkSentSchema>
 export type DevUser = z.infer<typeof DevUserSchema>

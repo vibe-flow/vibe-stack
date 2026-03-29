@@ -40,13 +40,13 @@ export const EnvSchema = z.object({
   BACKEND_PORT: z.string().default('3000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
-  // Mail
-  MAIL_HOST: z.string(),
-  MAIL_PORT: z.string(),
-  MAIL_FROM: z.string(),
+  // Mail (required when magic-link auth is enabled)
+  MAIL_HOST: z.string().default('localhost'),
+  MAIL_PORT: z.string().default('1025'),
+  MAIL_FROM: z.string().default('noreply@localhost'),
 
   // Frontend
-  FRONTEND_URL: z.string().url(),
+  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
 
   // Auth
   AUTH_REGISTRATION_MODE: z.string().optional(),
