@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useSearchParams, Link, useNavigate } from 'react-router-dom'
 import { trpc } from '@/lib/trpc'
 import { useAuthStore } from '@/stores/auth.store'
@@ -22,6 +22,7 @@ export default function VerifyPage() {
   const navigate = useNavigate()
   const setAuth = useAuthStore((state) => state.setAuth)
   const token = searchParams.get('token') ?? ''
+  const mutatedRef = useRef(false)
 
   const verifyMutation = trpc.auth.verifyMagicLink.useMutation({
     onSuccess: (data) => {
@@ -31,10 +32,33 @@ export default function VerifyPage() {
   })
 
   useEffect(() => {
-    if (token) {
+    if (token && !mutatedRef.current) {
+      mutatedRef.current = true
       verifyMutation.mutate({ token })
     }
   }, [token])
+
+  // No token in URL — show error immediately
+  if (!token) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle>Lien invalide</CardTitle>
+            <CardDescription>Aucun token fourni</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Ce lien de connexion est invalide. Veuillez demander un nouveau lien.
+            </p>
+            <Button asChild variant="outline" className="w-full">
+              <Link to="/login">Retour à la page de connexion</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   if (verifyMutation.isPending || (!verifyMutation.isError && !verifyMutation.isSuccess)) {
     return (
@@ -63,7 +87,7 @@ export default function VerifyPage() {
                 Votre compte est en attente de validation par un administrateur.
               </p>
               <Link to="/login" className="text-sm text-primary hover:underline">
-                Retour a la page de connexion
+                Retour à la page de connexion
               </Link>
             </CardContent>
           </Card>
@@ -76,15 +100,15 @@ export default function VerifyPage() {
         <div className="flex min-h-screen items-center justify-center bg-gray-50">
           <Card className="w-full max-w-md">
             <CardHeader>
-              <CardTitle>Compte desactive</CardTitle>
-              <CardDescription>Acces refuse</CardDescription>
+              <CardTitle>Compte désactivé</CardTitle>
+              <CardDescription>Accès refusé</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Ce compte a ete desactive. Contactez un administrateur.
+                Ce compte a été désactivé. Contactez un administrateur.
               </p>
               <Link to="/login" className="text-sm text-primary hover:underline">
-                Retour a la page de connexion
+                Retour à la page de connexion
               </Link>
             </CardContent>
           </Card>
@@ -101,9 +125,9 @@ export default function VerifyPage() {
             <CardDescription>Ce lien n&apos;est plus utilisable</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">Ce lien est invalide ou a expire.</p>
+            <p className="text-sm text-muted-foreground">Ce lien est invalide ou a expiré.</p>
             <Button asChild variant="outline" className="w-full">
-              <Link to="/login">Retour a la page de connexion</Link>
+              <Link to="/login">Retour à la page de connexion</Link>
             </Button>
           </CardContent>
         </Card>
