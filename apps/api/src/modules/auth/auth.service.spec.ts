@@ -305,6 +305,10 @@ describe('AuthService', () => {
     it('should return users in development mode', async () => {
       const originalEnv = process.env.NODE_ENV
       process.env.NODE_ENV = 'development'
+      vi.spyOn(service as any, 'authConfig', 'get').mockReturnValue({
+        ...mockAuthConfig,
+        devLogin: true,
+      })
       mockPrismaService.user.findMany.mockResolvedValue([mockUser])
 
       const result = await service.getDevUsers()

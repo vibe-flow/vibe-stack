@@ -190,7 +190,7 @@ export class AuthService {
   async getDevUsers(): Promise<
     Array<{ id: string; email: string; name: string | null; role: string }>
   > {
-    if (process.env.NODE_ENV !== 'development') {
+    if (!this.authConfig.devLogin || process.env.NODE_ENV !== 'development') {
       throw new UnauthorizedException('Dev-only endpoint')
     }
 
@@ -205,7 +205,7 @@ export class AuthService {
   }
 
   async loginAs(email?: string, role?: string): Promise<AuthResponse> {
-    if (process.env.NODE_ENV !== 'development') {
+    if (!this.authConfig.devLogin || process.env.NODE_ENV !== 'development') {
       throw new UnauthorizedException('Dev-only endpoint')
     }
 

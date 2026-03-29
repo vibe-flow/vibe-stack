@@ -1,4 +1,14 @@
-import { Controller, Post, Get, Body, Query, UseGuards, Request, Inject } from '@nestjs/common'
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Query,
+  UseGuards,
+  Request,
+  Inject,
+  HttpCode,
+} from '@nestjs/common'
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiResponse } from '@nestjs/swagger'
 import { AuthService } from './auth.service'
 import { JwtAuthGuard } from './guards/jwt-auth.guard'
@@ -16,9 +26,10 @@ export class AuthController {
   constructor(@Inject(AuthService) private readonly authService: AuthService) {}
 
   @Post('magic-link')
+  @HttpCode(200)
   @ApiOperation({ summary: 'Send a magic link by email' })
   @ApiBody({ type: SendMagicLinkDto })
-  @ApiResponse({ status: 201, description: 'Magic link sent' })
+  @ApiResponse({ status: 200, description: 'Magic link sent' })
   @ApiResponse({ status: 400, description: 'Validation error', type: ApiErrorDto })
   async sendMagicLink(@Body() body: SendMagicLinkDto) {
     return this.authService.sendMagicLink(body.email)
