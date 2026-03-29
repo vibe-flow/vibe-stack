@@ -6,7 +6,7 @@ import { useIsAuthenticated, useAuthLoading, useAccessToken } from './stores/aut
 import { useSseStore } from './stores/sse.store'
 import { useEntityInvalidation } from './hooks/useEntityInvalidation'
 import LoginPage from './pages/LoginPage'
-import RegisterPage from './pages/RegisterPage'
+import VerifyPage from './pages/VerifyPage'
 import DashboardPage from './pages/DashboardPage'
 import SettingsPage from './pages/SettingsPage'
 
@@ -99,10 +99,10 @@ function App() {
           }
         />
         <Route
-          path="/register"
+          path="/auth/verify"
           element={
             <DemoPublicRoute>
-              <RegisterPage />
+              <VerifyPage />
             </DemoPublicRoute>
           }
         />
@@ -141,10 +141,10 @@ function App() {
           }
         />
         <Route
-          path="/register"
+          path="/auth/verify"
           element={
             <PublicRoute>
-              <RegisterPage />
+              <VerifyPage />
             </PublicRoute>
           }
         />
