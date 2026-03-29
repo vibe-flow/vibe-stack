@@ -135,6 +135,29 @@ describe('AuthService', () => {
       expect(mockMailService.sendMagicLink).toHaveBeenCalled()
     })
 
+    it('should not send magic link to DISABLED user in open mode', async () => {
+      mockPrismaService.magicToken.findFirst.mockResolvedValue(null)
+      mockPrismaService.magicToken.deleteMany.mockResolvedValue({ count: 0 })
+      mockPrismaService.user.findUnique.mockResolvedValue({ ...mockUser, status: 'DISABLED' })
+
+      const result = await service.sendMagicLink('disabled@example.com')
+
+      expect(result).toEqual({ success: true, message: expect.any(String) })
+      expect(mockMailService.sendMagicLink).not.toHaveBeenCalled()
+      expect(mockPrismaService.magicToken.create).not.toHaveBeenCalled()
+    })
+
+    it('should not send magic link to PENDING user in open mode', async () => {
+      mockPrismaService.magicToken.findFirst.mockResolvedValue(null)
+      mockPrismaService.magicToken.deleteMany.mockResolvedValue({ count: 0 })
+      mockPrismaService.user.findUnique.mockResolvedValue({ ...mockUser, status: 'PENDING' })
+
+      const result = await service.sendMagicLink('pending@example.com')
+
+      expect(result).toEqual({ success: true, message: expect.any(String) })
+      expect(mockMailService.sendMagicLink).not.toHaveBeenCalled()
+    })
+
     it('should create PENDING user but not send email in approval mode', async () => {
       vi.spyOn(service as any, 'authConfig', 'get').mockReturnValue({
         ...mockAuthConfig,
@@ -289,6 +312,16 @@ describe('AuthService', () => {
         expect.any(String),
         true,
       )
+    })
+
+    it('should throw CONFLICT if user already exists', async () => {
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser)
+
+      await expect(service.inviteUser('test@example.com', 'USER')).rejects.toThrow(TRPCError)
+      await expect(service.inviteUser('test@example.com', 'USER')).rejects.toMatchObject({
+        code: 'CONFLICT',
+      })
+      expect(mockPrismaService.user.create).not.toHaveBeenCalled()
     })
   })
 
