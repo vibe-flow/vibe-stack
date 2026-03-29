@@ -24,4 +24,29 @@ export default tseslint.config(
       eqeqeq: ['error', 'always'],
     },
   },
+  {
+    files: ['apps/web/**/*.{ts,tsx}'],
+    ignores: [
+      'apps/web/src/hooks/use-persisted-state.ts',
+      'apps/web/src/hooks/use-url-state.ts',
+      'apps/web/src/components/ui/**',
+      'apps/web/src/test/**',
+      'apps/web/src/**/*.spec.ts',
+    ],
+    rules: {
+      'no-restricted-imports': [
+        'warn',
+        {
+          paths: [
+            {
+              name: 'react',
+              importNames: ['useState'],
+              message:
+                'Preferer usePersistedState pour les etats qui doivent survivre au refresh. useState reste OK pour les etats ephemeres (modals, loading, animations) — ajouter // eslint-disable-line no-restricted-imports.',
+            },
+          ],
+        },
+      ],
+    },
+  },
 );
