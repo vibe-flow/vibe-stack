@@ -5,6 +5,7 @@ import { useDemo } from './demo/DemoProvider'
 import { useIsAuthenticated, useAuthLoading, useAccessToken } from './stores/auth.store'
 import { useSseStore } from './stores/sse.store'
 import { useEntityInvalidation } from './hooks/useEntityInvalidation'
+import { usePreferencesSync } from './hooks/use-preferences-sync'
 import LoginPage from './pages/LoginPage'
 import VerifyPage from './pages/VerifyPage'
 import DashboardPage from './pages/DashboardPage'
@@ -18,6 +19,7 @@ function SseManager() {
   const accessToken = useAccessToken()
   const isAuthenticated = useIsAuthenticated()
   useEntityInvalidation()
+  usePreferencesSync()
 
   useEffect(() => {
     if (isAuthenticated && accessToken) {
