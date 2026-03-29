@@ -4,7 +4,7 @@ import { z } from 'zod'
 const AuthConfigSchema = z.object({
   registrationMode: z.enum(['open', 'approval', 'invite-only']).default('open'),
   magicLinkTtl: z.number().default(15),
-  devLogin: z.boolean().default(true),
+  devLogin: z.boolean().default(false),
 })
 
 export default registerAs('auth', () => {

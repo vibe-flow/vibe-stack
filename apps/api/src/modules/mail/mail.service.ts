@@ -8,15 +8,21 @@ export class MailService {
   private readonly transporter: nodemailer.Transporter
 
   constructor(@Inject(ConfigService) private readonly configService: ConfigService) {
+    const port = parseInt(this.configService.get<string>('MAIL_PORT') ?? '1025', 10)
+    const host = this.configService.get<string>('MAIL_HOST')
+    const user = this.configService.get<string>('MAIL_USER')
+    const pass = this.configService.get<string>('MAIL_PASS')
+
     this.transporter = nodemailer.createTransport({
-      host: this.configService.get<string>('MAIL_HOST'),
-      port: this.configService.get<number>('MAIL_PORT'),
+      host,
+      port,
+      ...(user && pass ? { auth: { user, pass } } : {}),
     })
   }
 
   async sendMagicLink(email: string, token: string, isInvite: boolean): Promise<void> {
     const frontendUrl = this.configService.get<string>('FRONTEND_URL')
-    const url = `${frontendUrl}/auth/verify?token=${token}`
+    const url = `${frontendUrl}/auth/verify?token=${encodeURIComponent(token)}`
     const from = this.configService.get<string>('MAIL_FROM')
 
     const subject = isInvite
@@ -44,7 +50,12 @@ export class MailService {
 </body>
 </html>`
 
-    await this.transporter.sendMail({ from, to: email, subject, html })
-    this.logger.log(`Magic link email sent to ${email}`)
+    try {
+      await this.transporter.sendMail({ from, to: email, subject, html })
+      this.logger.log(`Magic link email sent to ${email}`)
+    } catch (error) {
+      this.logger.error(`Failed to send magic link email to ${email}`, error)
+      throw new Error('Failed to send email')
+    }
   }
 }

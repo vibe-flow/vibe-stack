@@ -44,6 +44,8 @@ export const EnvSchema = z.object({
   MAIL_HOST: z.string().default('localhost'),
   MAIL_PORT: z.string().default('1025'),
   MAIL_FROM: z.string().default('noreply@localhost'),
+  MAIL_USER: z.string().optional(),
+  MAIL_PASS: z.string().optional(),
 
   // Frontend
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
