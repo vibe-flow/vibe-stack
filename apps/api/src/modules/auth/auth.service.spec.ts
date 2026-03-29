@@ -3,61 +3,72 @@ import type { TestingModule } from '@nestjs/testing'
 import { Test } from '@nestjs/testing'
 import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
-import { ConflictException, UnauthorizedException } from '@nestjs/common'
+import { UnauthorizedException } from '@nestjs/common'
+import { TRPCError } from '@trpc/server'
 import { AuthService } from './auth.service'
 import { PrismaService } from '../prisma/prisma.service'
+import { MailService } from '../mail/mail.service'
 
-// Mock bcryptjs
-vi.mock('bcryptjs', () => ({
-  hash: vi.fn().mockResolvedValue('hashed_password'),
-  compare: vi
-    .fn()
-    .mockImplementation((plain, hashed) => Promise.resolve(plain === 'correct_password')),
-}))
+const mockUser = {
+  id: 'user-123',
+  email: 'test@example.com',
+  name: 'Test User',
+  role: 'USER' as const,
+  status: 'ACTIVE' as const,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+}
+
+const mockPrismaService = {
+  user: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+    findMany: vi.fn(),
+    create: vi.fn(),
+  },
+  refreshToken: {
+    create: vi.fn(),
+    findUnique: vi.fn(),
+    delete: vi.fn(),
+    deleteMany: vi.fn(),
+  },
+  magicToken: {
+    findFirst: vi.fn(),
+    deleteMany: vi.fn(),
+    create: vi.fn(),
+    findUnique: vi.fn(),
+    update: vi.fn(),
+  },
+}
+
+const mockJwtService = {
+  sign: vi.fn().mockReturnValue('mock_token'),
+  verify: vi.fn().mockReturnValue({ sub: 'user-123' }),
+}
+
+const mockConfigService = {
+  get: vi.fn().mockImplementation((key: string, defaultValue?: string) => {
+    const config: Record<string, string> = {
+      JWT_SECRET: 'test-secret',
+      JWT_REFRESH_SECRET: 'test-refresh-secret',
+      JWT_REFRESH_EXPIRES_IN: '7d',
+    }
+    return config[key] ?? defaultValue
+  }),
+}
+
+const mockMailService = {
+  sendMagicLink: vi.fn().mockResolvedValue(undefined),
+}
+
+const mockAuthConfig = {
+  registrationMode: 'open' as const,
+  magicLinkTtl: 15,
+  devLogin: false,
+}
 
 describe('AuthService', () => {
   let service: AuthService
-  let prismaService: PrismaService
-  let jwtService: JwtService
-
-  const mockUser = {
-    id: 'user-123',
-    email: 'test@example.com',
-    password: 'hashed_password',
-    name: 'Test User',
-    role: 'USER',
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  }
-
-  const mockPrismaService = {
-    user: {
-      findUnique: vi.fn(),
-      create: vi.fn(),
-    },
-    refreshToken: {
-      create: vi.fn(),
-      findUnique: vi.fn(),
-      delete: vi.fn(),
-      deleteMany: vi.fn(),
-    },
-  }
-
-  const mockJwtService = {
-    sign: vi.fn().mockReturnValue('mock_token'),
-    verify: vi.fn().mockReturnValue({ sub: 'user-123' }),
-  }
-
-  const mockConfigService = {
-    get: vi.fn().mockImplementation((key: string, defaultValue?: string) => {
-      const config: Record<string, string> = {
-        JWT_SECRET: 'test-secret',
-        JWT_REFRESH_SECRET: 'test-refresh-secret',
-        JWT_REFRESH_EXPIRES_IN: '7d',
-      }
-      return config[key] ?? defaultValue
-    }),
-  }
 
   beforeEach(async () => {
     vi.clearAllMocks()
@@ -68,90 +79,289 @@ describe('AuthService', () => {
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
+        { provide: MailService, useValue: mockMailService },
+        { provide: 'auth', useValue: mockAuthConfig },
       ],
     }).compile()
 
     service = module.get<AuthService>(AuthService)
-    prismaService = module.get<PrismaService>(PrismaService)
-    jwtService = module.get<JwtService>(JwtService)
   })
 
-  describe('register', () => {
-    it('should register a new user successfully', async () => {
+  describe('sendMagicLink', () => {
+    it('should return success silently if cooldown token exists', async () => {
+      mockPrismaService.magicToken.findFirst.mockResolvedValue({
+        id: 'token-1',
+        email: 'test@example.com',
+        createdAt: new Date(),
+      })
+
+      const result = await service.sendMagicLink('test@example.com')
+
+      expect(result).toEqual({ success: true, message: expect.any(String) })
+      expect(mockMailService.sendMagicLink).not.toHaveBeenCalled()
+    })
+
+    it('should create user and send magic link in open mode', async () => {
+      mockPrismaService.magicToken.findFirst.mockResolvedValue(null)
+      mockPrismaService.magicToken.deleteMany.mockResolvedValue({ count: 0 })
+      mockPrismaService.user.findUnique.mockResolvedValue(null)
+      mockPrismaService.user.create.mockResolvedValue({ ...mockUser })
+      mockPrismaService.magicToken.create.mockResolvedValue({})
+
+      const result = await service.sendMagicLink('new@example.com')
+
+      expect(result).toEqual({ success: true, message: expect.any(String) })
+      expect(mockPrismaService.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ email: 'new@example.com', status: 'ACTIVE' }),
+        }),
+      )
+      expect(mockMailService.sendMagicLink).toHaveBeenCalledWith(
+        'new@example.com',
+        expect.any(String),
+        false,
+      )
+    })
+
+    it('should send magic link to existing active user in open mode', async () => {
+      mockPrismaService.magicToken.findFirst.mockResolvedValue(null)
+      mockPrismaService.magicToken.deleteMany.mockResolvedValue({ count: 0 })
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser)
+      mockPrismaService.magicToken.create.mockResolvedValue({})
+
+      const result = await service.sendMagicLink('test@example.com')
+
+      expect(result).toEqual({ success: true, message: expect.any(String) })
+      expect(mockMailService.sendMagicLink).toHaveBeenCalled()
+    })
+
+    it('should create PENDING user but not send email in approval mode', async () => {
+      vi.spyOn(service as any, 'authConfig', 'get').mockReturnValue({
+        ...mockAuthConfig,
+        registrationMode: 'approval',
+      })
+      mockPrismaService.magicToken.findFirst.mockResolvedValue(null)
+      mockPrismaService.magicToken.deleteMany.mockResolvedValue({ count: 0 })
+      mockPrismaService.user.findUnique.mockResolvedValue(null)
+      mockPrismaService.user.create.mockResolvedValue({ ...mockUser, status: 'PENDING' })
+
+      const result = await service.sendMagicLink('pending@example.com')
+
+      expect(result).toEqual({ success: true, message: expect.any(String) })
+      expect(mockPrismaService.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: 'PENDING' }),
+        }),
+      )
+      expect(mockMailService.sendMagicLink).not.toHaveBeenCalled()
+    })
+
+    it('should not create user and not send email in invite-only mode for unknown email', async () => {
+      vi.spyOn(service as any, 'authConfig', 'get').mockReturnValue({
+        ...mockAuthConfig,
+        registrationMode: 'invite-only',
+      })
+      mockPrismaService.magicToken.findFirst.mockResolvedValue(null)
+      mockPrismaService.magicToken.deleteMany.mockResolvedValue({ count: 0 })
+      mockPrismaService.user.findUnique.mockResolvedValue(null)
+
+      const result = await service.sendMagicLink('unknown@example.com')
+
+      expect(result).toEqual({ success: true, message: expect.any(String) })
+      expect(mockPrismaService.user.create).not.toHaveBeenCalled()
+      expect(mockMailService.sendMagicLink).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('verifyMagicLink', () => {
+    const rawToken = 'a'.repeat(64)
+
+    it('should throw BAD_REQUEST if token not found', async () => {
+      mockPrismaService.magicToken.findUnique.mockResolvedValue(null)
+
+      await expect(service.verifyMagicLink(rawToken)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      })
+    })
+
+    it('should throw BAD_REQUEST if token is expired', async () => {
+      mockPrismaService.magicToken.findUnique.mockResolvedValue({
+        id: 'token-1',
+        tokenHash: 'hash',
+        email: 'test@example.com',
+        userId: 'user-123',
+        expiresAt: new Date(Date.now() - 1000),
+        usedAt: null,
+      })
+
+      await expect(service.verifyMagicLink(rawToken)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      })
+    })
+
+    it('should throw BAD_REQUEST if token already used', async () => {
+      mockPrismaService.magicToken.findUnique.mockResolvedValue({
+        id: 'token-1',
+        tokenHash: 'hash',
+        email: 'test@example.com',
+        userId: 'user-123',
+        expiresAt: new Date(Date.now() + 900000),
+        usedAt: new Date(),
+      })
+
+      await expect(service.verifyMagicLink(rawToken)).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      })
+    })
+
+    it('should throw FORBIDDEN with ACCOUNT_PENDING cause if user is PENDING', async () => {
+      mockPrismaService.magicToken.findUnique.mockResolvedValue({
+        id: 'token-1',
+        tokenHash: 'hash',
+        email: 'pending@example.com',
+        userId: null,
+        expiresAt: new Date(Date.now() + 900000),
+        usedAt: null,
+      })
+      mockPrismaService.magicToken.update.mockResolvedValue({})
+      mockPrismaService.user.findUnique.mockResolvedValue({ ...mockUser, status: 'PENDING' })
+
+      await expect(service.verifyMagicLink(rawToken)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        cause: { code: 'ACCOUNT_PENDING' },
+      })
+    })
+
+    it('should throw FORBIDDEN with ACCOUNT_DISABLED cause if user is DISABLED', async () => {
+      mockPrismaService.magicToken.findUnique.mockResolvedValue({
+        id: 'token-1',
+        tokenHash: 'hash',
+        email: 'disabled@example.com',
+        userId: 'user-123',
+        expiresAt: new Date(Date.now() + 900000),
+        usedAt: null,
+      })
+      mockPrismaService.magicToken.update.mockResolvedValue({})
+      mockPrismaService.user.findUnique.mockResolvedValue({ ...mockUser, status: 'DISABLED' })
+
+      await expect(service.verifyMagicLink(rawToken)).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+        cause: { code: 'ACCOUNT_DISABLED' },
+      })
+    })
+
+    it('should return auth tokens for active user', async () => {
+      mockPrismaService.magicToken.findUnique.mockResolvedValue({
+        id: 'token-1',
+        tokenHash: 'hash',
+        email: 'test@example.com',
+        userId: 'user-123',
+        expiresAt: new Date(Date.now() + 900000),
+        usedAt: null,
+      })
+      mockPrismaService.magicToken.update.mockResolvedValue({})
+      mockPrismaService.user.findUnique.mockResolvedValue(mockUser)
+      mockPrismaService.refreshToken.create.mockResolvedValue({})
+
+      const result = await service.verifyMagicLink(rawToken)
+
+      expect(result).toHaveProperty('accessToken')
+      expect(result).toHaveProperty('refreshToken')
+      expect(result.user.status).toBe('ACTIVE')
+    })
+  })
+
+  describe('inviteUser', () => {
+    it('should create user with ACTIVE status and send invite email', async () => {
       mockPrismaService.user.findUnique.mockResolvedValue(null)
       mockPrismaService.user.create.mockResolvedValue(mockUser)
-      mockPrismaService.refreshToken.create.mockResolvedValue({})
+      mockPrismaService.magicToken.create.mockResolvedValue({})
 
-      const result = await service.register({
-        email: 'test@example.com',
-        password: 'password123',
-        name: 'Test User',
-      })
+      await service.inviteUser('invited@example.com', 'USER')
 
-      expect(result).toHaveProperty('accessToken')
-      expect(result).toHaveProperty('refreshToken')
-      expect(result.user.email).toBe('test@example.com')
-    })
-
-    it('should throw ConflictException if user already exists', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser)
-
-      await expect(
-        service.register({
-          email: 'test@example.com',
-          password: 'password123',
-          name: 'Test User',
+      expect(mockPrismaService.user.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ email: 'invited@example.com', status: 'ACTIVE' }),
         }),
-      ).rejects.toThrow(ConflictException)
+      )
+      expect(mockMailService.sendMagicLink).toHaveBeenCalledWith(
+        'invited@example.com',
+        expect.any(String),
+        true,
+      )
     })
   })
 
-  describe('login', () => {
-    it('should login successfully with correct credentials', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser)
-      mockPrismaService.refreshToken.create.mockResolvedValue({})
+  describe('getDevUsers', () => {
+    it('should throw UnauthorizedException outside development', async () => {
+      const originalEnv = process.env.NODE_ENV
+      process.env.NODE_ENV = 'production'
 
-      const result = await service.login({
-        email: 'test@example.com',
-        password: 'correct_password',
+      await expect(service.getDevUsers()).rejects.toThrow(UnauthorizedException)
+
+      process.env.NODE_ENV = originalEnv
+    })
+
+    it('should return users in development mode', async () => {
+      const originalEnv = process.env.NODE_ENV
+      process.env.NODE_ENV = 'development'
+      vi.spyOn(service as any, 'authConfig', 'get').mockReturnValue({
+        ...mockAuthConfig,
+        devLogin: true,
       })
+      mockPrismaService.user.findMany.mockResolvedValue([mockUser])
 
-      expect(result).toHaveProperty('accessToken')
-      expect(result).toHaveProperty('refreshToken')
-    })
+      const result = await service.getDevUsers()
 
-    it('should throw UnauthorizedException with wrong password', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(mockUser)
+      expect(result).toHaveLength(1)
+      expect(result[0]).toHaveProperty('email')
 
-      await expect(
-        service.login({
-          email: 'test@example.com',
-          password: 'wrong_password',
-        }),
-      ).rejects.toThrow(UnauthorizedException)
-    })
-
-    it('should throw UnauthorizedException if user not found', async () => {
-      mockPrismaService.user.findUnique.mockResolvedValue(null)
-
-      await expect(
-        service.login({
-          email: 'nonexistent@example.com',
-          password: 'password',
-        }),
-      ).rejects.toThrow(UnauthorizedException)
+      process.env.NODE_ENV = originalEnv
     })
   })
 
   describe('validateUser', () => {
-    it('should return user data without password', async () => {
-      const { password, ...userWithoutPassword } = mockUser
-      mockPrismaService.user.findUnique.mockResolvedValue(userWithoutPassword)
+    it('should return user with status field', async () => {
+      const userWithStatus = {
+        id: 'user-123',
+        email: 'test@example.com',
+        name: 'Test',
+        role: 'USER',
+        status: 'ACTIVE',
+      }
+      mockPrismaService.user.findUnique.mockResolvedValue(userWithStatus)
 
       const result = await service.validateUser('user-123')
 
-      expect(result).toBeDefined()
-      expect(result).not.toHaveProperty('password')
+      expect(result).toHaveProperty('status')
+    })
+  })
+
+  describe('generateTokens', () => {
+    it('should include status in returned user object', async () => {
+      mockPrismaService.refreshToken.create.mockResolvedValue({})
+
+      const result = await (service as any).generateTokens(mockUser)
+
+      expect(result.user).toHaveProperty('status', 'ACTIVE')
+    })
+  })
+
+  describe('refreshToken', () => {
+    it('should throw UnauthorizedException for invalid token', async () => {
+      mockPrismaService.refreshToken.findUnique.mockResolvedValue(null)
+
+      await expect(service.refreshToken('invalid-token')).rejects.toThrow(UnauthorizedException)
+    })
+  })
+
+  describe('logout', () => {
+    it('should delete refresh token', async () => {
+      mockPrismaService.refreshToken.deleteMany.mockResolvedValue({ count: 1 })
+
+      await service.logout('user-123', 'some-refresh-token')
+
+      expect(mockPrismaService.refreshToken.deleteMany).toHaveBeenCalled()
     })
   })
 })

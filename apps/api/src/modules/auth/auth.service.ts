@@ -1,15 +1,12 @@
-import {
-  Injectable,
-  UnauthorizedException,
-  ConflictException,
-  Logger,
-  Inject,
-} from '@nestjs/common'
+import { Injectable, UnauthorizedException, Logger, Inject } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
-import { compare, hash } from 'bcryptjs'
+import * as crypto from 'crypto'
+import { TRPCError } from '@trpc/server'
 import { PrismaService } from '../prisma/prisma.service'
-import type { LoginInput, RegisterInput, AuthResponse } from '@template-dev/shared'
+import { MailService } from '../mail/mail.service'
+import type { AuthConfig } from '../../config/auth.config'
+import type { AuthResponse } from '@template-dev/shared'
 
 @Injectable()
 export class AuthService {
@@ -19,54 +16,196 @@ export class AuthService {
     @Inject(PrismaService) private prisma: PrismaService,
     @Inject(JwtService) private jwtService: JwtService,
     @Inject(ConfigService) private configService: ConfigService,
+    @Inject(MailService) private mailService: MailService,
+    @Inject('auth') private authConfig: AuthConfig,
   ) {}
 
-  async register(input: RegisterInput): Promise<AuthResponse> {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: input.email },
-    })
+  async sendMagicLink(email: string): Promise<{ success: true; message: string }> {
+    const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000)
 
-    if (existingUser) {
-      throw new ConflictException('User with this email already exists')
-    }
-
-    const hashedPassword = await hash(input.password, 10)
-
-    const user = await this.prisma.user.create({
-      data: {
-        email: input.email,
-        password: hashedPassword,
-        name: input.name,
+    // Cooldown: check if a recent unused token exists
+    const recentToken = await this.prisma.magicToken.findFirst({
+      where: {
+        email,
+        createdAt: { gt: twoMinutesAgo },
+        usedAt: null,
       },
     })
 
-    this.logger.log(`New user registered: ${user.email}`)
+    if (recentToken) {
+      return { success: true, message: 'Si ce compte existe, un email a été envoyé' }
+    }
+
+    // Cleanup expired tokens for this email
+    await this.prisma.magicToken.deleteMany({
+      where: {
+        email,
+        expiresAt: { lt: new Date() },
+      },
+    })
+
+    const rawToken = crypto.randomBytes(32).toString('hex')
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
+
+    const user = await this.prisma.user.findUnique({ where: { email } })
+
+    let shouldSend = false
+    let userId: string | undefined
+
+    if (this.authConfig.registrationMode === 'open') {
+      if (!user) {
+        const newUser = await this.prisma.user.create({
+          data: { email, status: 'ACTIVE' },
+        })
+        userId = newUser.id
+        shouldSend = true
+      } else if (user.status === 'ACTIVE') {
+        userId = user.id
+        shouldSend = true
+      } else {
+        shouldSend = false
+      }
+    } else if (this.authConfig.registrationMode === 'approval') {
+      if (!user) {
+        await this.prisma.user.create({
+          data: { email, status: 'PENDING' },
+        })
+        shouldSend = false
+      } else if (user.status === 'ACTIVE') {
+        userId = user.id
+        shouldSend = true
+      } else {
+        shouldSend = false
+      }
+    } else {
+      // invite-only
+      if (!user) {
+        shouldSend = false
+      } else if (user.status === 'ACTIVE') {
+        userId = user.id
+        shouldSend = true
+      } else {
+        shouldSend = false
+      }
+    }
+
+    if (shouldSend) {
+      const expiresAt = new Date(Date.now() + this.authConfig.magicLinkTtl * 60 * 1000)
+
+      await this.prisma.magicToken.create({
+        data: {
+          tokenHash,
+          email,
+          ...(userId ? { userId } : {}),
+          expiresAt,
+        },
+      })
+
+      await this.mailService.sendMagicLink(email, rawToken, false)
+      this.logger.log(`Magic link sent to ${email}`)
+    }
+
+    return { success: true, message: 'Si ce compte existe, un email a été envoyé' }
+  }
+
+  async verifyMagicLink(token: string): Promise<AuthResponse> {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+
+    const magicToken = await this.prisma.magicToken.findUnique({ where: { tokenHash } })
+
+    if (!magicToken) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid or expired link' })
+    }
+
+    if (magicToken.expiresAt < new Date() || magicToken.usedAt !== null) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid or expired link' })
+    }
+
+    // Mark token as used
+    await this.prisma.magicToken.update({
+      where: { id: magicToken.id },
+      data: { usedAt: new Date() },
+    })
+
+    const user = await this.prisma.user.findUnique({ where: { email: magicToken.email } })
+
+    if (!user) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid or expired link' })
+    }
+
+    // Link token to user if not yet linked
+    if (!magicToken.userId) {
+      await this.prisma.magicToken.update({
+        where: { id: magicToken.id },
+        data: { userId: user.id },
+      })
+    }
+
+    if (user.status === 'PENDING') {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Account pending approval',
+        cause: { code: 'ACCOUNT_PENDING' },
+      })
+    }
+
+    if (user.status === 'DISABLED') {
+      throw new TRPCError({
+        code: 'FORBIDDEN',
+        message: 'Account disabled',
+        cause: { code: 'ACCOUNT_DISABLED' },
+      })
+    }
 
     return this.generateTokens(user)
   }
 
-  async login(input: LoginInput): Promise<AuthResponse> {
-    const user = await this.prisma.user.findUnique({
-      where: { email: input.email },
+  async inviteUser(email: string, role: 'USER' | 'ADMIN'): Promise<void> {
+    const existing = await this.prisma.user.findUnique({ where: { email } })
+    if (existing) {
+      throw new TRPCError({ code: 'CONFLICT', message: 'User with this email already exists' })
+    }
+
+    const user = await this.prisma.user.create({
+      data: { email, role, status: 'ACTIVE' },
     })
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid credentials')
+    const rawToken = crypto.randomBytes(32).toString('hex')
+    const tokenHash = crypto.createHash('sha256').update(rawToken).digest('hex')
+    const expiresAt = new Date(Date.now() + this.authConfig.magicLinkTtl * 60 * 1000)
+
+    await this.prisma.magicToken.create({
+      data: {
+        tokenHash,
+        email,
+        userId: user.id,
+        expiresAt,
+      },
+    })
+
+    await this.mailService.sendMagicLink(email, rawToken, true)
+    this.logger.log(`Invite sent to ${email}`)
+  }
+
+  async getDevUsers(): Promise<
+    Array<{ id: string; email: string; name: string | null; role: string }>
+  > {
+    if (!this.authConfig.devLogin || process.env.NODE_ENV !== 'development') {
+      throw new UnauthorizedException('Dev-only endpoint')
     }
 
-    const isPasswordValid = await compare(input.password, user.password)
-
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials')
-    }
-
-    this.logger.log(`User logged in: ${user.email}`)
-
-    return this.generateTokens(user)
+    return this.prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        role: true,
+      },
+    })
   }
 
   async loginAs(email?: string, role?: string): Promise<AuthResponse> {
-    if (process.env.NODE_ENV !== 'development') {
+    if (!this.authConfig.devLogin || process.env.NODE_ENV !== 'development') {
       throw new UnauthorizedException('Dev-only endpoint')
     }
 
@@ -85,7 +224,7 @@ export class AuthService {
 
   async refreshToken(refreshToken: string): Promise<AuthResponse> {
     try {
-      const payload = this.jwtService.verify(refreshToken, {
+      this.jwtService.verify(refreshToken, {
         secret: this.configService.get('JWT_REFRESH_SECRET'),
       })
 
@@ -103,7 +242,7 @@ export class AuthService {
       })
 
       return this.generateTokens(tokenRecord.user)
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException('Invalid refresh token')
     }
   }
@@ -155,6 +294,7 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
+        status: user.status,
       },
     }
   }
@@ -167,6 +307,7 @@ export class AuthService {
         email: true,
         name: true,
         role: true,
+        status: true,
       },
     })
   }

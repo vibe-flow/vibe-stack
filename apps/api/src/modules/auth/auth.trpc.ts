@@ -2,7 +2,13 @@ import { Injectable, Inject } from '@nestjs/common'
 import { TrpcService } from '../../trpc/trpc.service'
 import { AuthService } from './auth.service'
 import { UsersService } from '../users/users.service'
-import { LoginSchema, RegisterSchema, RefreshTokenSchema } from '@template-dev/shared'
+import {
+  SendMagicLinkSchema,
+  VerifyMagicLinkSchema,
+  DevLoginSchema,
+  InviteUserSchema,
+  RefreshTokenSchema,
+} from '@template-dev/shared'
 
 @Injectable()
 export class AuthTrpc {
@@ -14,12 +20,27 @@ export class AuthTrpc {
     @Inject(UsersService) private readonly usersService: UsersService,
   ) {
     this.router = this.trpc.router({
-      login: this.trpc.procedure.input(LoginSchema).mutation(async ({ input }) => {
-        return await this.authService.login(input)
+      sendMagicLink: this.trpc.procedure.input(SendMagicLinkSchema).mutation(async ({ input }) => {
+        return await this.authService.sendMagicLink(input.email)
       }),
 
-      register: this.trpc.procedure.input(RegisterSchema).mutation(async ({ input }) => {
-        return await this.authService.register(input)
+      verifyMagicLink: this.trpc.procedure
+        .input(VerifyMagicLinkSchema)
+        .mutation(async ({ input }) => {
+          return await this.authService.verifyMagicLink(input.token)
+        }),
+
+      devUsers: this.trpc.procedure.query(async () => {
+        return await this.authService.getDevUsers()
+      }),
+
+      devLogin: this.trpc.procedure.input(DevLoginSchema).mutation(async ({ input }) => {
+        return await this.authService.loginAs(input.email, input.role)
+      }),
+
+      inviteUser: this.trpc.adminProcedure.input(InviteUserSchema).mutation(async ({ input }) => {
+        await this.authService.inviteUser(input.email, input.role)
+        return { success: true }
       }),
 
       refresh: this.trpc.procedure.input(RefreshTokenSchema).mutation(async ({ input }) => {

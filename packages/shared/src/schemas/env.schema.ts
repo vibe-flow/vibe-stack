@@ -39,6 +39,21 @@ export const EnvSchema = z.object({
   FRONTEND_PORT: z.string().default('5173'),
   BACKEND_PORT: z.string().default('3000'),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
+
+  // Mail (required when magic-link auth is enabled)
+  MAIL_HOST: z.string().default('localhost'),
+  MAIL_PORT: z.string().default('1025'),
+  MAIL_FROM: z.string().default('noreply@localhost'),
+  MAIL_USER: z.string().optional(),
+  MAIL_PASS: z.string().optional(),
+
+  // Frontend
+  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+
+  // Auth
+  AUTH_REGISTRATION_MODE: z.string().optional(),
+  AUTH_MAGIC_LINK_TTL: z.string().optional(),
+  AUTH_DEV_LOGIN: z.string().optional(),
 })
 
 export type Env = z.infer<typeof EnvSchema>

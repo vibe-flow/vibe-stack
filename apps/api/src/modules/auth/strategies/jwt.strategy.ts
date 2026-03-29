@@ -8,7 +8,7 @@ import type { AuthService } from '../auth.service'
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     @Inject(ConfigService) configService: ConfigService,
-    private authService: AuthService,
+    @Inject(AuthService) private authService: AuthService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -24,10 +24,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException()
     }
 
+    if (user.status !== 'ACTIVE') {
+      throw new UnauthorizedException()
+    }
+
     return {
       userId: payload.sub,
       email: payload.email,
       role: payload.role,
+      status: user.status,
     }
   }
 }

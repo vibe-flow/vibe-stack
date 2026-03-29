@@ -16,16 +16,23 @@ enum UserRole {
   ADMIN
 }
 
+enum UserStatus {
+  ACTIVE
+  PENDING
+  DISABLED
+}
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  password  String
+  id        String     @id @default(cuid())
+  email     String     @unique
   name      String?
-  role      UserRole @default(USER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  role      UserRole   @default(USER)
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
 
   refreshTokens RefreshToken[]
+  magicTokens   MagicToken[]
 
   @@map("users")
 }
@@ -41,6 +48,21 @@ model RefreshToken {
 
   @@index([userId])
   @@map("refresh_tokens")
+}
+
+model MagicToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  email     String
+  userId    String?
+  user      User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
+  @@map("magic_tokens")
 }
 
 model Setting {

@@ -1,12 +1,33 @@
 {
   "name": "template-dev",
   "version": "1.0.0",
-  "type": "module",
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@swc/cli": "^0.7.9",
+    "@swc/core": "^1.15.8",
+    "@types/node": "^22.10.5",
+    "@vitest/coverage-v8": "^4.0.14",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.0.0",
+    "prettier-plugin-tailwindcss": "^0.7.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.48.0",
+    "vitest": "^4.0.14"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css}": [
+      "prettier --write"
+    ]
+  },
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
     "dev": "bun run --filter=@template-dev/api dev & bun run --filter=@template-dev/web dev",
     "dev:api": "bun run --filter=@template-dev/api dev",
@@ -25,30 +46,9 @@
     "prisma:seed": "bunx prisma db seed",
     "prisma:studio": "bunx prisma studio"
   },
-  "lint-staged": {
-    "*.{ts,tsx}": [
-      "eslint --fix",
-      "prettier --write"
-    ],
-    "*.{json,md,css}": [
-      "prettier --write"
-    ]
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.39.1",
-    "@swc/cli": "^0.7.9",
-    "@swc/core": "^1.15.8",
-    "@types/node": "^22.10.5",
-    "@vitest/coverage-v8": "^4.0.14",
-    "eslint": "^9.0.0",
-    "eslint-config-prettier": "^10.0.0",
-    "husky": "^9.0.0",
-    "lint-staged": "^15.0.0",
-    "prettier": "^3.0.0",
-    "prettier-plugin-tailwindcss": "^0.7.2",
-    "tsx": "^4.20.6",
-    "typescript": "^5.7.2",
-    "typescript-eslint": "^8.48.0",
-    "vitest": "^4.0.14"
-  }
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }

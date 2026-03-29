@@ -7,6 +7,7 @@ interface User {
   email: string
   name: string | null
   role: 'USER' | 'ADMIN'
+  status: 'ACTIVE' | 'PENDING' | 'DISABLED'
 }
 
 interface AuthState {
