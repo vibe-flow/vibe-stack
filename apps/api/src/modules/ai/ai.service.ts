@@ -1,21 +1,27 @@
 import type { OnModuleInit } from '@nestjs/common'
 import { Injectable, Logger, Inject } from '@nestjs/common'
 import { ConfigService } from '@nestjs/config'
-import type { OpenAIEmbeddings } from '@langchain/openai'
-import { ChatOpenAI } from '@langchain/openai'
-import type { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres'
-import type { BaseMessage } from '@langchain/core/messages'
-import { createChatModel, createEmbeddings, createCheckpointer } from './providers'
-import { LangfuseService } from '../langfuse'
+import type { ZodSchema } from 'zod'
+import { zodToJsonSchema } from 'zod-to-json-schema'
+import type { ChatMessage } from '@template-dev/shared'
 
 export interface ChatCompletionParams {
   model?: string
-  messages: BaseMessage[]
+  messages: ChatMessage[]
   temperature?: number
   maxTokens?: number
   userId?: string
   sessionId?: string
   tags?: string[]
+}
+
+export interface ChatCompletionResponse {
+  content: string
+  usage?: {
+    prompt_tokens?: number
+    completion_tokens?: number
+    total_tokens?: number
+  }
 }
 
 export interface EmbeddingParams {
@@ -24,42 +30,31 @@ export interface EmbeddingParams {
   userId?: string
 }
 
+export interface StructuredExtractParams<T> {
+  schema: ZodSchema<T>
+  systemPrompt: string
+  text: string
+  model?: string
+  temperature?: number
+}
+
 @Injectable()
 export class AiService implements OnModuleInit {
   private readonly logger = new Logger(AiService.name)
-  private model: ChatOpenAI | null = null
-  private embeddings: OpenAIEmbeddings | null = null
-  private checkpointer: PostgresSaver | null = null
+  private configured = false
 
   private readonly litellmBaseUrl: string | undefined
   private readonly litellmApiKey: string | undefined
 
-  constructor(
-    @Inject(ConfigService) private configService: ConfigService,
-    @Inject(LangfuseService) private langfuseService: LangfuseService,
-  ) {
+  constructor(@Inject(ConfigService) private configService: ConfigService) {
     this.litellmBaseUrl = this.configService.get('LITELLM_BASE_URL')
     this.litellmApiKey = this.configService.get('LITELLM_MASTER_KEY')
   }
 
   async onModuleInit() {
-    await this.initializeModel()
-    await this.initializeCheckpointer()
-  }
-
-  private async initializeModel() {
     if (this.litellmBaseUrl && this.litellmApiKey) {
-      this.model = createChatModel({
-        baseURL: this.litellmBaseUrl,
-        apiKey: this.litellmApiKey,
-      })
-
-      this.embeddings = createEmbeddings({
-        baseURL: this.litellmBaseUrl,
-        apiKey: this.litellmApiKey,
-      })
-
-      this.logger.log('LangChain model initialized (via LiteLLM)')
+      this.configured = true
+      this.logger.log('AI service initialized (direct LiteLLM)')
     } else {
       this.logger.warn(
         'LiteLLM not configured. Set LITELLM_BASE_URL and LITELLM_MASTER_KEY to enable AI features.',
@@ -67,154 +62,143 @@ export class AiService implements OnModuleInit {
     }
   }
 
-  private async initializeCheckpointer() {
-    const databaseUrl = this.configService.get('DATABASE_URL')
-
-    if (databaseUrl) {
-      try {
-        this.checkpointer = await createCheckpointer(databaseUrl)
-        this.logger.log('PostgreSQL checkpointer initialized for LangGraph')
-      } catch (error) {
-        this.logger.warn(
-          `Failed to initialize checkpointer: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        )
-      }
-    } else {
-      this.logger.warn('DATABASE_URL not configured. LangGraph checkpointer disabled.')
-    }
-  }
-
   // === Direct LLM calls ===
 
-  async chatCompletion(params: ChatCompletionParams) {
-    if (!this.model) {
-      throw new Error('AI model not configured')
-    }
+  async chatCompletion(params: ChatCompletionParams): Promise<ChatCompletionResponse> {
+    this.ensureConfigured()
 
-    const modelName = params.model ?? 'gpt-4o-mini'
+    const model = params.model ?? 'gpt-4o-mini'
     const temperature = params.temperature ?? 0.7
 
-    // Create model with custom settings if needed
-    const needsCustomModel =
-      params.model || params.temperature !== undefined || params.maxTokens !== undefined
-    const model = needsCustomModel
-      ? new ChatOpenAI({
-          model: modelName,
-          temperature,
-          maxTokens: params.maxTokens,
-          configuration: {
-            baseURL: this.litellmBaseUrl!,
-            apiKey: this.litellmApiKey!,
-          },
-        })
-      : this.model
-
-    // Start Langfuse trace
-    const tracing = this.langfuseService.startGeneration(
-      {
-        name: 'chat-completion',
-        userId: params.userId,
-        sessionId: params.sessionId,
-        tags: params.tags,
-      },
-      {
-        model: modelName,
-        input: params.messages.map((m) => ({ role: m.getType(), content: m.content })),
-        modelParameters: { temperature, maxTokens: params.maxTokens ?? null },
-      },
-    )
-
-    if (!tracing) {
-      this.logger.debug('Langfuse tracing disabled')
+    const body: Record<string, unknown> = {
+      model,
+      messages: params.messages,
+      temperature,
     }
+    if (params.maxTokens !== undefined) body.max_tokens = params.maxTokens
 
     try {
       const startTime = Date.now()
-      const response = await model.invoke(params.messages)
+      const data = await this.post('/chat/completions', body)
       const endTime = Date.now()
 
-      // End Langfuse trace with response
-      if (tracing) {
-        this.langfuseService.endGeneration(tracing.generation, response.content, {
-          promptTokens: response.usage_metadata?.input_tokens,
-          completionTokens: response.usage_metadata?.output_tokens,
-          totalTokens: response.usage_metadata?.total_tokens,
-        })
-        // Fire and forget flush
-        this.langfuseService.flush().catch((err) => {
-          this.logger.warn('Langfuse flush failed:', err)
-        })
-      }
+      const choice = data.choices?.[0]
+      const content = choice?.message?.content ?? ''
 
       this.logger.log(`Chat completion completed in ${endTime - startTime}ms`)
-      return response
+
+      return {
+        content,
+        usage: data.usage
+          ? {
+              prompt_tokens: data.usage.prompt_tokens,
+              completion_tokens: data.usage.completion_tokens,
+              total_tokens: data.usage.total_tokens,
+            }
+          : undefined,
+      }
     } catch (error) {
       this.logger.error('Chat completion error:', error)
       throw error
     }
   }
 
-  async embedding(params: EmbeddingParams): Promise<number[][]> {
-    if (!this.embeddings) {
-      throw new Error('Embeddings model not configured')
+  async structuredExtract<T>(params: StructuredExtractParams<T>): Promise<T> {
+    this.ensureConfigured()
+
+    const model = params.model ?? 'gpt-4o-mini'
+    const temperature = params.temperature ?? 0
+
+    const jsonSchema = zodToJsonSchema(params.schema, 'extract')
+    const toolDefinition = {
+      type: 'function' as const,
+      function: {
+        name: 'extract',
+        description: 'Extract structured data from the text',
+        parameters: jsonSchema.definitions?.extract ?? jsonSchema,
+      },
     }
 
-    const embeddings = params.model
-      ? createEmbeddings({
-          baseURL: this.litellmBaseUrl!,
-          apiKey: this.litellmApiKey!,
-          model: params.model,
-        })
-      : this.embeddings
+    const body = {
+      model,
+      messages: [
+        { role: 'system', content: params.systemPrompt },
+        { role: 'user', content: params.text },
+      ],
+      tools: [toolDefinition],
+      tool_choice: { type: 'function' as const, function: { name: 'extract' } },
+      temperature,
+    }
 
     try {
-      const inputs = Array.isArray(params.input) ? params.input : [params.input]
-      const result = await embeddings.embedDocuments(inputs)
-      return result
+      const data = await this.post('/chat/completions', body)
+
+      const toolCall = data.choices?.[0]?.message?.tool_calls?.[0]
+      if (!toolCall?.function?.arguments) {
+        throw new Error('No tool call in response')
+      }
+
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(toolCall.function.arguments)
+      } catch {
+        throw new Error(`Failed to parse tool call arguments: ${toolCall.function.arguments}`)
+      }
+
+      return params.schema.parse(parsed)
+    } catch (error) {
+      this.logger.error('Structured extract error:', error)
+      throw error
+    }
+  }
+
+  async embedding(params: EmbeddingParams): Promise<number[][]> {
+    this.ensureConfigured()
+
+    const model = params.model ?? 'text-embedding-3-small'
+    const input = Array.isArray(params.input) ? params.input : [params.input]
+
+    try {
+      const data = await this.post('/embeddings', { model, input })
+      return data.data.map((item: { embedding: number[] }) => item.embedding)
     } catch (error) {
       this.logger.error('Embedding error:', error)
       throw error
     }
   }
 
-  // === LangGraph helpers ===
-
-  getModel(options?: { model?: string; temperature?: number }): ChatOpenAI {
-    if (!this.litellmBaseUrl || !this.litellmApiKey) {
-      throw new Error('AI model not configured')
-    }
-
-    if (options?.model || options?.temperature !== undefined) {
-      return createChatModel({
-        baseURL: this.litellmBaseUrl,
-        apiKey: this.litellmApiKey,
-        model: options.model,
-        temperature: options.temperature,
-      })
-    }
-
-    if (!this.model) {
-      throw new Error('AI model not configured')
-    }
-
-    return this.model
-  }
-
-  getCheckpointer(): PostgresSaver | null {
-    return this.checkpointer
-  }
-
   // === Status ===
 
   isConfigured(): boolean {
-    return this.model !== null
+    return this.configured
   }
 
-  isCheckpointerConfigured(): boolean {
-    return this.checkpointer !== null
+  // === Private ===
+
+  private ensureConfigured(): void {
+    if (!this.configured) {
+      throw new Error('AI model not configured')
+    }
   }
 
-  isLangfuseConfigured(): boolean {
-    return this.langfuseService.isConfigured()
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async post(path: string, body: unknown): Promise<any> {
+    const url = `${this.litellmBaseUrl}${path}`
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.litellmApiKey}`,
+      },
+      body: JSON.stringify(body),
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`LiteLLM error ${response.status}: ${errorText}`)
+    }
+
+    return response.json()
   }
 }
