@@ -1,5 +1,4 @@
 import { Injectable, Inject } from '@nestjs/common'
-import { HumanMessage, SystemMessage, AIMessage } from '@langchain/core/messages'
 import { TrpcService } from '../../trpc/trpc.service'
 import { AiService } from './ai.service'
 import { ChatCompletionSchema, EmbeddingSchema } from '@template-dev/shared'
@@ -16,8 +15,6 @@ export class AiTrpc {
       status: this.trpc.protectedProcedure.query(() => {
         return {
           configured: this.aiService.isConfigured(),
-          checkpointerConfigured: this.aiService.isCheckpointerConfigured(),
-          langfuseConfigured: this.aiService.isLangfuseConfigured(),
         }
       }),
 
@@ -33,21 +30,9 @@ export class AiTrpc {
           }
 
           try {
-            const messages = input.messages.map((msg) => {
-              switch (msg.role) {
-                case 'system':
-                  return new SystemMessage(msg.content)
-                case 'assistant':
-                  return new AIMessage(msg.content)
-                case 'user':
-                default:
-                  return new HumanMessage(msg.content)
-              }
-            })
-
             const response = await this.aiService.chatCompletion({
               model: input.model,
-              messages,
+              messages: input.messages,
               temperature: input.temperature,
               maxTokens: input.maxTokens,
               userId: ctx.user?.userId,
@@ -58,12 +43,12 @@ export class AiTrpc {
             return {
               success: true,
               error: null,
-              response: response.content as string,
+              response: response.content,
             }
-          } catch (error) {
+          } catch {
             return {
               success: false,
-              error: error instanceof Error ? error.message : 'Unknown error',
+              error: 'AI request failed',
               response: null,
             }
           }
@@ -92,10 +77,10 @@ export class AiTrpc {
               error: null,
               embeddings,
             }
-          } catch (error) {
+          } catch {
             return {
               success: false,
-              error: error instanceof Error ? error.message : 'Unknown error',
+              error: 'Embedding request failed',
               embeddings: null,
             }
           }
