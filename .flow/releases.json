@@ -3,16 +3,34 @@
     "version": "2.0.0",
     "date": "2026-03-30",
     "commit": "694217fb789abc2b726f1c1766b21cb63b941736",
-    "summary": "Auth magic-link natif, AiService direct LiteLLM (suppression LangChain/Langfuse), AppLayout sidebar, hooks persistance UI, module user-preferences, suppression mode demo.",
+    "summary": "Refonte module AI (appels directs LiteLLM), ajout sidebar, suppression LangChain/Langfuse et mode demo.",
+    "severity": "critical",
+    "migration": false,
+    "integration_notes": "Si le projet a le module magic-link installé (vérifier modules.magic-link dans .flow/vibe-stack-lock.json), le core v2.0.0 le remplace nativement : comparer le auth.service.ts du core avec celui du projet, conserver les customisations spécifiques au projet, supprimer l'entrée magic-link du lock modules.\n\nSi le projet utilise AiService.getModel() ou AiService.getCheckpointer() (LangGraph), installer le module langgraph via /import-module langgraph et remplacer l'injection de AiService par LangGraphService pour ces appels. AiService.chatCompletion() et AiService.embedding() restent dans le core."
+  },
+  {
+    "version": "1.2.0",
+    "date": "2026-03-29",
+    "commit": "d6a498f1cb27e71799db3f1366d4f14b546a675d",
+    "summary": "Persistance d'état UI, module user-preferences, couverture de tests renforcée.",
+    "severity": "moderate",
+    "migration": true,
+    "integration_notes": ""
+  },
+  {
+    "version": "1.1.0",
+    "date": "2026-03-29",
+    "commit": "5766ac6a6abb0376c9d811febc57ec2434cef02b",
+    "summary": "Authentification par magic-link, remplacement du système login/password.",
     "severity": "critical",
     "migration": true,
-    "integration_notes": "Si le projet a le module magic-link installé (vérifier modules.magic-link dans .flow/vibe-stack-lock.json), le core v2.0.0 le remplace nativement : comparer le auth.service.ts du core avec celui du projet, conserver les customisations spécifiques au projet (rate limiting, EmailSender custom, etc.), supprimer l'entrée magic-link du lock modules. Le module magic-link de vibe-stack-modules est obsolète pour les projets en core v2.0.0+.\n\nSi le projet utilise AiService.getModel() ou AiService.getCheckpointer() (LangGraph), installer le module langgraph via /import-module langgraph et remplacer l'injection de AiService par LangGraphService pour ces appels. AiService.chatCompletion() et AiService.embedding() restent dans le core avec la nouvelle API directe LiteLLM. Supprimer @langchain/* et langfuse des dépendances sauf si le module langgraph les réimporte."
+    "integration_notes": "Le système d'auth par password (login/register avec bcryptjs) est remplacé par magic-link. Si le projet utilise l'ancien flow, migrer : supprimer RegisterPage, adapter LoginPage, ajouter VerifyPage et MailModule, créer la migration Prisma pour MagicToken et UserStatus, ajouter les env vars MAIL_HOST/MAIL_PORT/MAIL_FROM."
   },
   {
     "version": "1.0.0",
-    "date": "2026-03-29",
+    "date": "2026-03-26",
     "commit": "ad32014e5139aa915ffea66517e79acce6bbae26",
-    "summary": "Version initiale — point de départ du système de versioning.",
+    "summary": "Version initiale du système de versioning.",
     "severity": "low",
     "migration": false,
     "integration_notes": ""
