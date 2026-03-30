@@ -1,5 +1,140 @@
 [
   {
+    "version": "2.0.0",
+    "date": "2026-03-30",
+    "commit": "694217fb789abc2b726f1c1766b21cb63b941736",
+    "summary": "Réécriture auth (magic-link), AiService direct LiteLLM, sidebar layout, suppression LangChain/Langfuse/demo mode, ajout user-preferences et persistance UI.",
+    "severity": "critical",
+    "changes": [
+      {
+        "type": "added",
+        "scope": "api",
+        "description": "Auth magic-link : MailService, MagicToken, flow complet de vérification, authConfig",
+        "files": ["apps/api/src/modules/auth/**", "apps/api/src/modules/mail/**", "apps/api/src/config/auth.config.ts"],
+        "breaking": true,
+        "migration": true,
+        "integration": "Si le projet utilise l'auth par password (login/register avec bcryptjs), migrer vers magic-link : supprimer RegisterPage, adapter LoginPage pour envoyer un magic link, ajouter VerifyPage, ajouter MailModule dans AppModule, créer la migration Prisma pour MagicToken et UserStatus enum, ajouter les env vars MAIL_HOST/MAIL_PORT/MAIL_FROM, supprimer bcryptjs des dépendances. Si le projet a déjà magic-link (module importé), vérifier la compatibilité avec le nouveau auth.service.ts du core."
+      },
+      {
+        "type": "added",
+        "scope": "api",
+        "description": "Module user-preferences : persistance des préférences utilisateur en BDD avec sync frontend",
+        "files": ["apps/api/src/modules/user-preferences/**"],
+        "breaking": false,
+        "migration": true,
+        "integration": "Ajouter UserPreferencesModule dans AppModule, créer la migration Prisma pour le model UserPreference, enregistrer UserPreferencesTrpc dans TrpcModule et TrpcRouter. Si le projet a déjà un système de préférences utilisateur, évaluer la migration vers ce module standard."
+      },
+      {
+        "type": "added",
+        "scope": "web",
+        "description": "Hooks de persistance d'état : usePersistedState, useUrlState, usePreferencesSync",
+        "files": ["apps/web/src/hooks/use-persisted-state.ts", "apps/web/src/hooks/use-url-state.ts", "apps/web/src/hooks/use-preferences-sync.ts"],
+        "breaking": false,
+        "migration": false,
+        "integration": "Copier les hooks dans apps/web/src/hooks/. Si le projet a déjà des hooks de persistance localStorage, évaluer la migration vers usePersistedState qui gère aussi la sync BDD via le module user-preferences."
+      },
+      {
+        "type": "added",
+        "scope": "web",
+        "description": "AppLayout avec sidebar collapsible + ui.store.ts",
+        "files": ["apps/web/src/components/layout/AppLayout.tsx", "apps/web/src/stores/ui.store.ts"],
+        "breaking": false,
+        "migration": false,
+        "integration": "Copier AppLayout et ui.store.ts. Wrapper les routes protégées dans AppLayout (voir App.tsx). Adapter les NAV_ITEMS dans AppLayout.tsx selon les pages du projet. Renommer 'Vibe Stack' par le nom du projet dans le logo sidebar."
+      },
+      {
+        "type": "added",
+        "scope": "web",
+        "description": "VerifyPage pour vérification magic-link + SSE store et hooks",
+        "files": ["apps/web/src/pages/VerifyPage.tsx", "apps/web/src/stores/sse.store.ts", "apps/web/src/hooks/useSseEvent.ts", "apps/web/src/hooks/useEntityInvalidation.ts"],
+        "breaking": false,
+        "migration": false,
+        "integration": ""
+      },
+      {
+        "type": "added",
+        "scope": "shared",
+        "description": "Schemas user-preferences, SSE, auth mis à jour (MagicToken, UserStatus)",
+        "files": ["packages/shared/src/schemas/user-preferences.schema.ts", "packages/shared/src/schemas/sse.schema.ts", "packages/shared/src/schemas/auth.schema.ts"],
+        "breaking": false,
+        "migration": false,
+        "integration": ""
+      },
+      {
+        "type": "changed",
+        "scope": "api",
+        "description": "AiService : appels HTTP directs LiteLLM via fetch, nouvelle méthode structuredExtract<T>, suppression getModel()/getCheckpointer()",
+        "files": ["apps/api/src/modules/ai/ai.service.ts", "apps/api/src/modules/ai/ai.trpc.ts", "apps/api/src/modules/ai/ai.module.ts"],
+        "breaking": true,
+        "migration": false,
+        "integration": "Si le projet utilise AiService.getModel() ou AiService.getCheckpointer() (LangGraph), installer le module langgraph via /import-module langgraph et remplacer l'injection de AiService par LangGraphService pour ces appels. AiService.chatCompletion() et AiService.embedding() restent disponibles dans le core avec la nouvelle API directe LiteLLM. Supprimer @langchain/* et langfuse des dépendances du projet sauf si le module langgraph les réimporte."
+      },
+      {
+        "type": "changed",
+        "scope": "web",
+        "description": "DashboardPage sobre avec stack status, LoginPage adapté magic-link",
+        "files": ["apps/web/src/pages/DashboardPage.tsx", "apps/web/src/pages/LoginPage.tsx"],
+        "breaking": false,
+        "migration": false,
+        "integration": ""
+      },
+      {
+        "type": "changed",
+        "scope": "config",
+        "description": "ESLint : règle warn sur useState pour forcer la réflexion sur la persistance",
+        "files": ["eslint.config.js"],
+        "breaking": false,
+        "migration": false,
+        "integration": ""
+      },
+      {
+        "type": "changed",
+        "scope": "prisma",
+        "description": "Schema : ajout MagicToken, enum UserStatus, model UserPreference",
+        "files": ["prisma/schema.prisma"],
+        "breaking": true,
+        "migration": true,
+        "integration": "Créer une migration Prisma pour ajouter le model MagicToken, l'enum UserStatus (avec valeur par défaut ACTIVE sur User.status), et le model UserPreference. Si le projet a déjà un champ status sur User, adapter la migration pour ne pas perdre les données existantes."
+      },
+      {
+        "type": "removed",
+        "scope": "api",
+        "description": "Suppression LangChain, Langfuse, module langfuse, providers LangChain — extraits en module langgraph",
+        "files": ["apps/api/src/modules/langfuse/**", "apps/api/src/modules/ai/providers/**", "apps/api/src/modules/ai/graphs/**", "apps/api/src/modules/ai/tools/**", "apps/api/src/modules/ai/memory/**", "apps/api/src/modules/ai/rag/**"],
+        "breaking": true,
+        "migration": false,
+        "integration": "Supprimer les imports de LangfuseModule et LangfuseService. Retirer LangfuseModule de AppModule et AiModule. Si le projet utilise Langfuse pour le tracing, le réintroduire comme dépendance directe du projet ou via un module dédié."
+      },
+      {
+        "type": "removed",
+        "scope": "web",
+        "description": "Suppression complète du mode demo (DemoProvider, routes, hooks, DEMO.md)",
+        "files": ["apps/web/src/demo/**", "apps/web/DEMO.md"],
+        "breaking": true,
+        "migration": false,
+        "integration": "Si le projet utilise le mode demo (VITE_DEMO_MODE, DemoProvider, demo/), supprimer le dossier apps/web/src/demo/, retirer les imports DEMO_MODE et les routes DemoProtectedRoute/DemoPublicRoute de App.tsx, simplifier main.tsx pour ne garder que le tRPC Provider. Supprimer VITE_DEMO_MODE de vite-env.d.ts."
+      },
+      {
+        "type": "removed",
+        "scope": "web",
+        "description": "Suppression RegisterPage (remplacé par magic-link)",
+        "files": ["apps/web/src/pages/RegisterPage.tsx"],
+        "breaking": true,
+        "migration": false,
+        "integration": "Supprimer apps/web/src/pages/RegisterPage.tsx si elle existe. Retirer la route /register de App.tsx. Le flow d'inscription passe désormais par magic-link (même flow que login)."
+      },
+      {
+        "type": "fixed",
+        "scope": "api",
+        "description": "Fix import type AuthService dans jwt.strategy.ts (crash runtime avec tsx/Bun)",
+        "files": ["apps/api/src/modules/auth/strategies/jwt.strategy.ts"],
+        "breaking": false,
+        "migration": false,
+        "integration": "Vérifier que jwt.strategy.ts utilise import { AuthService } (pas import type { AuthService }) pour éviter un crash runtime avec tsx."
+      }
+    ]
+  },
+  {
     "version": "1.0.0",
     "date": "2026-03-29",
     "commit": "ad32014e5139aa915ffea66517e79acce6bbae26",
