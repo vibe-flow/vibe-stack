@@ -28,9 +28,90 @@
   },
   {
     "version": "1.0.0",
-    "date": "2026-03-26",
+    "date": "2026-03-29",
     "commit": "ad32014e5139aa915ffea66517e79acce6bbae26",
-    "summary": "Version initiale du système de versioning.",
+    "summary": "Mise en place du système de versioning avec releases.json.",
+    "severity": "low",
+    "migration": false,
+    "integration_notes": ""
+  },
+  {
+    "version": "0.9.0",
+    "date": "2026-03-24",
+    "commit": "0b71c1725a5114d2bb8b40755ed2458046192de7",
+    "summary": "Module SSE realtime (controller, guard, store frontend), config Hub URL.",
+    "severity": "moderate",
+    "migration": false,
+    "integration_notes": ""
+  },
+  {
+    "version": "0.8.0",
+    "date": "2026-03-21",
+    "commit": "510e6bee98511cd9811c265847f7b05d2ff090b6",
+    "summary": "Module settings avec registre dynamique, Prisma SSE mutation listener.",
+    "severity": "moderate",
+    "migration": true,
+    "integration_notes": ""
+  },
+  {
+    "version": "0.7.0",
+    "date": "2026-03-09",
+    "commit": "6c48337c7b1d193387b610dc1606f75e5b3f3fd4",
+    "summary": "Extraction des conventions CLAUDE.md en fichier partagé, endpoint dev login-as.",
+    "severity": "low",
+    "migration": false,
+    "integration_notes": "Les conventions vibe-stack sont extraites dans ~/.claude/shared/vibe-stack.md et référencées depuis le CLAUDE.md de chaque projet. Si le projet a un CLAUDE.md custom avec des conventions vibe-stack en dur, les déplacer vers le fichier partagé et garder seulement les conventions spécifiques au projet dans le CLAUDE.md local."
+  },
+  {
+    "version": "0.6.0",
+    "date": "2026-03-01",
+    "commit": "fe9111e5a2cd25523be311b26205eea401fc2f2b",
+    "summary": "Isolation schema PostgreSQL LangGraph, build SWC, convention deploy.json.",
+    "severity": "low",
+    "migration": false,
+    "integration_notes": ""
+  },
+  {
+    "version": "0.5.0",
+    "date": "2026-02-18",
+    "commit": "1b2f1acc27944c7bb33294158c4d306868dc270e",
+    "summary": "Deploy multi-stage Docker, pipeline CI/CD, intégration local-services.",
+    "severity": "moderate",
+    "migration": false,
+    "integration_notes": ""
+  },
+  {
+    "version": "0.4.0",
+    "date": "2026-01-09",
+    "commit": "edec0c4f92438bb2bd90cad6a52cd9d0417e06d7",
+    "summary": "Ajout du mode demo pour présentations client.",
+    "severity": "low",
+    "migration": false,
+    "integration_notes": "Le mode demo est ajouté (DemoProvider, routes dédiées, fake data). Note : ce mode sera supprimé en v2.0.0. Ne pas investir dans des customisations demo complexes."
+  },
+  {
+    "version": "0.3.0",
+    "date": "2025-12-01",
+    "commit": "22adf0b8bc508164abbaaed1fb9877b878ca26c4",
+    "summary": "Module AI unifié avec LangGraph, Langfuse tracing, rôles/permissions, interface en français, Docker.",
+    "severity": "moderate",
+    "migration": false,
+    "integration_notes": ""
+  },
+  {
+    "version": "0.2.0",
+    "date": "2025-11-30",
+    "commit": "cbb84872e7ff92c306d29f92f8a01cda6e514525",
+    "summary": "Swagger docs, Pino logger, Zustand auth avec refresh token, Vitest, ESLint/Prettier/Husky.",
+    "severity": "low",
+    "migration": false,
+    "integration_notes": ""
+  },
+  {
+    "version": "0.1.0",
+    "date": "2025-11-28",
+    "commit": "6aa5bce4e56ad75b534b24645496c06b34fafd2e",
+    "summary": "Init monorepo : Bun, NestJS, React/Vite, Prisma, tRPC, auth JWT basique.",
     "severity": "low",
     "migration": false,
     "integration_notes": ""
