@@ -13,7 +13,7 @@
         "files": ["apps/api/src/modules/auth/**", "apps/api/src/modules/mail/**", "apps/api/src/config/auth.config.ts"],
         "breaking": true,
         "migration": true,
-        "integration": "Si le projet utilise l'auth par password (login/register avec bcryptjs), migrer vers magic-link : supprimer RegisterPage, adapter LoginPage pour envoyer un magic link, ajouter VerifyPage, ajouter MailModule dans AppModule, créer la migration Prisma pour MagicToken et UserStatus enum, ajouter les env vars MAIL_HOST/MAIL_PORT/MAIL_FROM, supprimer bcryptjs des dépendances. Si le projet a déjà magic-link (module importé), vérifier la compatibilité avec le nouveau auth.service.ts du core."
+        "integration": "Si le projet utilise l'auth par password (login/register avec bcryptjs), migrer vers magic-link : supprimer RegisterPage, adapter LoginPage pour envoyer un magic link, ajouter VerifyPage, ajouter MailModule dans AppModule, créer la migration Prisma pour MagicToken et UserStatus enum, ajouter les env vars MAIL_HOST/MAIL_PORT/MAIL_FROM, supprimer bcryptjs des dépendances. Si le projet a le module magic-link installé (vérifier .flow/vibe-stack-lock.json clé modules.magic-link), le code auth du core v2.0.0 remplace ce module : comparer le auth.service.ts du core avec celui du projet (qui vient du module), conserver les customisations spécifiques au projet (méthodes ajoutées, logique métier custom), supprimer l'entrée magic-link du lock modules, et ne pas réimporter le module. Le module magic-link de vibe-stack-modules est désormais obsolète pour les projets en core v2.0.0+."
       },
       {
         "type": "added",
