@@ -18,7 +18,6 @@ const queryClient = new QueryClient({
         }
         return failureCount < 3
       },
-      staleTime: 1000 * 60, // 1 minute
     },
     mutations: {
       retry: false,
