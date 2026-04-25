@@ -1,11 +1,12 @@
 import { Injectable, UnauthorizedException, Logger, Inject } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { ConfigService } from '@nestjs/config'
+import type { ConfigType } from '@nestjs/config'
 import * as crypto from 'crypto'
 import { TRPCError } from '@trpc/server'
 import { PrismaService } from '../prisma/prisma.service'
 import { MailService } from '../mail/mail.service'
-import type { AuthConfig } from '../../config/auth.config'
+import authConfigFactory from '../../config/auth.config'
 import type { AuthResponse } from '@template-dev/shared'
 
 @Injectable()
@@ -17,7 +18,7 @@ export class AuthService {
     @Inject(JwtService) private jwtService: JwtService,
     @Inject(ConfigService) private configService: ConfigService,
     @Inject(MailService) private mailService: MailService,
-    @Inject('auth') private authConfig: AuthConfig,
+    @Inject(authConfigFactory.KEY) private authConfig: ConfigType<typeof authConfigFactory>,
   ) {}
 
   async sendMagicLink(email: string): Promise<{ success: true; message: string }> {

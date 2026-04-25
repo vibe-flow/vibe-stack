@@ -8,6 +8,7 @@ import { TRPCError } from '@trpc/server'
 import { AuthService } from './auth.service'
 import { PrismaService } from '../prisma/prisma.service'
 import { MailService } from '../mail/mail.service'
+import authConfig from '../../config/auth.config'
 
 const mockUser = {
   id: 'user-123',
@@ -80,7 +81,7 @@ describe('AuthService', () => {
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: MailService, useValue: mockMailService },
-        { provide: 'auth', useValue: mockAuthConfig },
+        { provide: authConfig.KEY, useValue: mockAuthConfig },
       ],
     }).compile()
 
