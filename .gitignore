@@ -6,6 +6,9 @@ node_modules/
 .env.local
 .env.*.local
 
+# Generated per-worktree (ports auto-assigned)
+.claude/launch.json
+
 # Build outputs
 dist/
 build/
