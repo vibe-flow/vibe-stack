@@ -1,9 +1,14 @@
+import { resolve } from 'node:path'
 import { Module } from '@nestjs/common'
 import { ConfigModule } from '@nestjs/config'
 import { ThrottlerModule } from '@nestjs/throttler'
 import { APP_PIPE } from '@nestjs/core'
 import { ZodValidationPipe } from 'nestjs-zod'
 import { EnvSchema } from '@template-dev/shared'
+
+// Charge .env du root du monorepo, peu importe le cwd du process
+// (necessaire car `bun run --filter` ne propage pas process.env du parent)
+const monorepoRoot = resolve(__dirname, '../../..')
 import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { PrismaModule } from './modules/prisma/prisma.module'
@@ -23,6 +28,7 @@ import authConfig from './config/auth.config'
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      envFilePath: [resolve(monorepoRoot, '.env.local'), resolve(monorepoRoot, '.env')],
       load: [authConfig],
       validate: (config) => {
         try {
